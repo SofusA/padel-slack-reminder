@@ -1,0 +1,79 @@
+#!/bin/bash
+
+set -e
+if [ ! -f "./.env" ]; then
+  echo "File \"./.env\" doesn't exist. Please create the file and fill the following items: 
+    APP_NAME='***'
+    AZURE_RESOURCE_GROUP='***'
+    AZURE_SUBSCRIPTION_ID='***'
+    GH_REPOSITORY='***/***'
+    AZURE_CR_NAME='***'
+    "
+  exit 1
+fi
+
+set -o allexport; source ./.env; set +o allexport
+
+az account set --subscription ${AZURE_SUBSCRIPTION_ID} > /dev/null
+
+echo "Creating containerapp envitonmend"
+
+az containerapp env create \
+  --name my-container-apps \
+  --resource-group ${AZURE_RESOURCE_GROUP} 
+
+echo "Creating containerapp job"
+
+az containerapp job create \
+  --name ${APP_NAME} \
+  --environment my-container-apps \
+  --resource-group ${AZURE_RESOURCE_GROUP} \
+  --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+  --trigger-type Schedule \
+  --cron-expression "0 10 * * *" 
+
+echo "Done"
+
+echo "Creating service principal"
+
+SP=$(az ad sp create-for-rbac \
+  --name ${APP_NAME}-sp \
+  --role "contributor" \
+  --scopes /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP})
+
+echo "Done"
+
+SP_APP_ID=$(echo $SP | jq -r ".appId")
+SP_PASSWORD=$(echo $SP | jq -r ".password")
+SP_TENANT=$(echo $SP | jq -r ".tenant")
+
+echo $SP_APP_ID
+echo $SP_PASSWORD
+echo $SP_TENANT
+
+echo "Done"
+
+echo "Getting access to Azure container registry"
+
+ACR=$(az acr credential show --resource-group SadDevelop --name ${AZURE_CR_NAME})
+ACR_PASSWORD=$(echo $ACR | jq -r ".passwords[0].value")
+
+echo $ACR_PASSWORD
+
+echo "Done"
+
+echo -n "Creating github action"
+
+az containerapp github-action add \
+  --repo-url "https://github.com/${GH_REPOSITORY}" \
+  --context-path "./Containerfile" \
+  --branch main \
+  --name ${APP_NAME} \
+  --resource-group ${AZURE_RESOURCE_GROUP} \
+  --registry-url ${AZURE_CR_NAME}.azurecr.io \
+  --registry-username ${AZURE_CR_NAME} \
+  --registry-password ${ACR_PASSWORD} \
+  --service-principal-client-id ${SP_APP_ID} \
+  --service-principal-client-secret ${SP_PASSWORD} \
+  --service-principal-tenant-id ${SP_TENANT} \
+  --login-with-github 

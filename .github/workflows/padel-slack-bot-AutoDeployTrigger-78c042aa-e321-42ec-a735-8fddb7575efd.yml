@@ -1,0 +1,33 @@
+name: Trigger auto deployment for padel-slack-bot
+
+on:
+  push:
+    branches: 
+      [ main ]
+  workflow_dispatch:
+      
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.PADELSLACKBOT_AZURE_CREDENTIALS }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          appSourcePath: ${{ github.workspace }}/ 
+          registryUrl: sadacr.azurecr.io
+          registryUsername: ${{ secrets.PADELSLACKBOT_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.PADELSLACKBOT_REGISTRY_PASSWORD }}
+          containerAppName: padel-slack-bot
+          resourceGroup: SadDevelop
+          imageToBuild: sadacr.azurecr.io/padel-slack-bot:${{ github.sha }}
+          dockerfilePath: Containerfile
+  
