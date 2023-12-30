@@ -1,0 +1,27 @@
+name: Run padel bot
+
+on:
+  schedule:
+    - cron: '0 10 * * *'
+
+  workflow_dispatch:
+
+jobs: 
+  run:
+    name: Run padel bot
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Setup | Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup | Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: run
+        env:
+            SLACK_HOOK: ${{ secrets.SLACK_HOOK}}
+            SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL}}
+        run: cargo run --release       
+  

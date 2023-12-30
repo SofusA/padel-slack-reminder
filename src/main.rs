@@ -6,27 +6,34 @@ use std::env;
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    post_paddle_msg();
+    match Local::now().weekday() {
+        Weekday::Mon => post_paddle_msg(),
+        Weekday::Tue => return,
+        Weekday::Wed => return,
+        Weekday::Thu => return,
+        Weekday::Fri => return,
+        Weekday::Sat => return,
+        Weekday::Sun => return,
+    }
 }
 
 fn post_paddle_msg() {
     let msg = get_slack_message();
 
-    if Local::now().weekday() == Weekday::Sun {
-        let slack_hook = env::var("SLACK_HOOK").unwrap();
-        let slack = Slack::new(&*slack_hook).unwrap();
+    let slack_hook = env::var("SLACK_HOOK").unwrap();
+    let slack_channel = env::var("SLACK_CHANNEL").unwrap();
+    let slack = Slack::new(&*slack_hook).unwrap();
 
-        let p = PayloadBuilder::new()
-            .text(msg.clone())
-            .channel("#padel")
-            .build()
-            .unwrap();
+    let p = PayloadBuilder::new()
+        .text(msg.clone())
+        .channel(format!("#{}", slack_channel))
+        .build()
+        .unwrap();
 
-        let res = slack.send(&p);
-        match res {
-            Ok(()) => print!("{}", msg),
-            Err(err) => print!("error: {}", err),
-        }
+    let res = slack.send(&p);
+    match res {
+        Ok(()) => print!("{}", msg),
+        Err(err) => print!("error: {}", err),
     }
 }
 
